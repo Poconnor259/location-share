@@ -70,9 +70,9 @@
 
     <script>
         // --- CONFIGURATION ---
-        // Replace these with your actual server addresses
-        const LOCATION_SERVER_URL = 'https://YOUR_SERVER_ADDRESS/location'; // HTTP endpoint
-        const VIDEO_SERVER_URL = 'wss://YOUR_SERVER_ADDRESS/video';     // WebSocket endpoint
+        // Updated to point to your local server
+        const LOCATION_SERVER_URL = 'http://localhost:3000/location';
+        const VIDEO_SERVER_URL = 'ws://localhost:3000';
 
         const startButton = document.getElementById('startButton');
         const statusDiv = document.getElementById('status');
