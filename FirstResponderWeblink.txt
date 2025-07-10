@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location and Video Share</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            text-align: center;
+        }
+        #container {
+            background: #ffffff;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        p {
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+            color: #606770;
+        }
+        button {
+            background-color: #1877f2;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #166fe5;
+        }
+        #status {
+            margin-top: 1.5rem;
+            font-weight: bold;
+        }
+        video {
+            margin-top: 1rem;
+            border-radius: 8px;
+            background: #000;
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <h1>Share Your Location & Video</h1>
+        <p>Please press the button below to share your live location and video stream.</p>
+        <button id="startButton">Start Sharing</button>
+        <div id="status"></div>
+        <video id="video" autoplay playsinline></video>
+    </div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const statusDiv = document.getElementById('status');
+        const videoElement = document.getElementById('video');
+
+        startButton.addEventListener('click', () => {
+            // Hide the button after it's clicked
+            startButton.style.display = 'none';
+            statusDiv.textContent = 'Requesting permissions...';
+
+            // 1. Request Location
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(handleLocation, handleLocationError, {
+                    enableHighAccuracy: true
+                });
+            } else {
+                statusDiv.textContent += '\nGeolocation is not supported by this browser.';
+            }
+
+            // 2. Request Video
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(handleVideo)
+                    .catch(handleVideoError);
+            } else {
+                statusDiv.textContent += '\ngetUserMedia is not supported by this browser.';
+            }
+        });
+
+        function handleLocation(position) {
+            const { latitude, longitude } = position.coords;
+            const locationText = `Location Shared: Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)}`;
+            
+            // For a real application, you would send this data to your server.
+            // For this prototype, we just display it.
+            console.log(locationText);
+            
+            // Check if video status is already set to avoid overwriting it
+            if (statusDiv.textContent.includes('Requesting')) {
+                statusDiv.textContent = locationText;
+            } else {
+                statusDiv.textContent += ` | ${locationText}`;
+            }
+        }
+
+        function handleLocationError(error) {
+            console.error("Location Error:", error.message);
+            statusDiv.textContent += '\nCould not get location.';
+        }
+
+        function handleVideo(stream) {
+            videoElement.srcObject = stream;
+            const videoText = "Video Sharing Active";
+            console.log(videoText);
+            
+            // Check if location status is already set to avoid overwriting it
+            if (statusDiv.textContent.includes('Requesting')) {
+                statusDiv.textContent = videoText;
+            } else {
+                statusDiv.textContent = `${videoText} | ${statusDiv.textContent}`;
+            }
+        }
+
+        function handleVideoError(error) {
+            console.error("Video Error:", error.message);
+            statusDiv.textContent += '\nCould not get video stream.';
+        }
+    </script>
+
+</body>
+</html>
