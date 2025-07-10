@@ -65,75 +65,97 @@
         <p>Please press the button below to share your live location and video stream.</p>
         <button id="startButton">Start Sharing</button>
         <div id="status"></div>
-        <video id="video" autoplay playsinline></video>
+        <video id="video" autoplay playsinline muted></video>
     </div>
 
     <script>
+        // --- CONFIGURATION ---
+        // Replace these with your actual server addresses
+        const LOCATION_SERVER_URL = 'https://YOUR_SERVER_ADDRESS/location'; // HTTP endpoint
+        const VIDEO_SERVER_URL = 'wss://YOUR_SERVER_ADDRESS/video';     // WebSocket endpoint
+
         const startButton = document.getElementById('startButton');
         const statusDiv = document.getElementById('status');
         const videoElement = document.getElementById('video');
 
+        let websocket;
+
         startButton.addEventListener('click', () => {
-            // Hide the button after it's clicked
             startButton.style.display = 'none';
             statusDiv.textContent = 'Requesting permissions...';
 
             // 1. Request Location
             if ('geolocation' in navigator) {
-                navigator.geolocation.getCurrentPosition(handleLocation, handleLocationError, {
+                // We use watchPosition to send continuous updates
+                navigator.geolocation.watchPosition(handleLocation, handleLocationError, {
                     enableHighAccuracy: true
                 });
             } else {
-                statusDiv.textContent += '\nGeolocation is not supported by this browser.';
+                statusDiv.textContent += '\nGeolocation is not supported.';
             }
 
-            // 2. Request Video
+            // 2. Request Video and set up streaming
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then(handleVideo)
+                navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false })
+                    .then(setupVideoStream)
                     .catch(handleVideoError);
             } else {
-                statusDiv.textContent += '\ngetUserMedia is not supported by this browser.';
+                statusDiv.textContent += '\ngetUserMedia is not supported.';
             }
         });
 
         function handleLocation(position) {
-            const { latitude, longitude } = position.coords;
-            const locationText = `Location Shared: Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)}`;
+            const { latitude, longitude, accuracy } = position.coords;
+            const locationData = { latitude, longitude, accuracy };
+            const statusText = `Location Shared: Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)}`;
             
-            // For a real application, you would send this data to your server.
-            // For this prototype, we just display it.
-            console.log(locationText);
+            console.log('Sending location:', locationData);
+            statusDiv.textContent = statusText;
+
+            // Send location data to your server via HTTP POST request
+            fetch(LOCATION_SERVER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(locationData)
+            }).catch(err => console.error('Location fetch error:', err));
+        }
+
+        function setupVideoStream(stream) {
+            videoElement.srcObject = stream; // Show video locally
+            statusDiv.textContent = 'Video stream active.';
             
-            // Check if video status is already set to avoid overwriting it
-            if (statusDiv.textContent.includes('Requesting')) {
-                statusDiv.textContent = locationText;
-            } else {
-                statusDiv.textContent += ` | ${locationText}`;
-            }
+            // Connect to WebSocket server
+            websocket = new WebSocket(VIDEO_SERVER_URL);
+
+            websocket.onopen = () => {
+                console.log('WebSocket connection opened.');
+                
+                // Use MediaRecorder to capture the stream into chunks
+                const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+                
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data && event.data.size > 0 && websocket.readyState === WebSocket.OPEN) {
+                        // Send the video chunk over the WebSocket
+                        websocket.send(event.data);
+                    }
+                };
+                
+                // Start recording and send data every 2 seconds
+                mediaRecorder.start(2000);
+            };
+
+            websocket.onclose = () => console.log('WebSocket connection closed.');
+            websocket.onerror = err => console.error('WebSocket error:', err);
         }
 
         function handleLocationError(error) {
             console.error("Location Error:", error.message);
-            statusDiv.textContent += '\nCould not get location.';
-        }
-
-        function handleVideo(stream) {
-            videoElement.srcObject = stream;
-            const videoText = "Video Sharing Active";
-            console.log(videoText);
-            
-            // Check if location status is already set to avoid overwriting it
-            if (statusDiv.textContent.includes('Requesting')) {
-                statusDiv.textContent = videoText;
-            } else {
-                statusDiv.textContent = `${videoText} | ${statusDiv.textContent}`;
-            }
+            statusDiv.textContent = 'Could not get location.';
         }
 
         function handleVideoError(error) {
             console.error("Video Error:", error.message);
-            statusDiv.textContent += '\nCould not get video stream.';
+            statusDiv.textContent = 'Could not get video stream.';
         }
     </script>
 
